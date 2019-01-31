@@ -23,7 +23,7 @@ import Json.Decode as Json
 import Task
 
 
-main : Program (Maybe Model) Model Msg
+main : Program (Maybe SerializedModel) Model Msg
 main =
     Browser.document
         { init = init
@@ -33,7 +33,7 @@ main =
         }
 
 
-port setStorage : Model -> Cmd msg
+port setStorage : SerializedModel -> Cmd msg
 
 
 {-| We want to `setStorage` on every update. This function adds the setStorage
@@ -46,22 +46,60 @@ updateWithStorage msg model =
             update msg model
     in
         ( newModel
-        , Cmd.batch [ setStorage newModel, cmds ]
+        , Cmd.batch [ setStorage (serialize newModel), cmds ]
         )
 
 
-
--- MODEL
-
-
--- The full application state of our todo app.
-type alias Model =
+type alias SerializedModel =
     { entries : List Entry
     , field : String
     , uid : Int
     , visibility : String
     }
 
+serialize : Model -> SerializedModel
+serialize model =
+    { entries = model.entries
+    , field = model.field
+    , uid = model.uid
+    , visibility = visibilityText model.visibility }
+
+deserialize : SerializedModel -> Model
+deserialize model =
+    let
+        viz =
+            if visibilityText (Active) == model.visibility then
+                Active
+            else if visibilityText (Completed) == model.visibility then
+                Completed
+            else
+                All
+    in
+    { entries = model.entries
+    , field = model.field
+    , uid = model.uid
+    , visibility = viz }
+
+-- MODEL
+
+type Visibility = All
+                | Active
+                | Completed
+
+visibilityText : Visibility -> String
+visibilityText visibility =
+    case visibility of
+        All -> "All"
+        Active -> "Active"
+        Completed -> "Done"
+
+-- The full application state of our todo app.
+type alias Model =
+    { entries : List Entry
+    , field : String
+    , uid : Int
+    , visibility : Visibility
+    }
 
 type alias Entry =
     { description : String
@@ -71,7 +109,7 @@ type alias Entry =
     }
 
 
-emptyModel : Model
+emptyModel : SerializedModel
 emptyModel =
     { entries = []
     , visibility = "All"
@@ -89,9 +127,9 @@ newEntry desc id =
     }
 
 
-init : Maybe Model -> ( Model, Cmd Msg )
+init : Maybe SerializedModel -> ( Model, Cmd Msg )
 init maybeModel =
-  ( Maybe.withDefault emptyModel maybeModel
+  ( deserialize (Maybe.withDefault emptyModel maybeModel)
   , Cmd.none
   )
 
@@ -114,7 +152,7 @@ type Msg
     | DeleteComplete
     | Check Int Bool
     | CheckAll Bool
-    | ChangeVisibility String
+    | ChangeVisibility Visibility
 
 
 
@@ -261,18 +299,18 @@ onEnter msg =
 -- VIEW ALL ENTRIES
 
 
-viewEntries : String -> List Entry -> Html Msg
+viewEntries : Visibility -> List Entry -> Html Msg
 viewEntries visibility entries =
     let
         isVisible todo =
             case visibility of
-                "Completed" ->
+                Completed ->
                     todo.completed
 
-                "Active" ->
+                Active ->
                     not todo.completed
 
-                _ ->
+                All ->
                     True
 
         allCompleted =
@@ -352,7 +390,7 @@ viewEntry todo =
 -- VIEW CONTROLS AND FOOTER
 
 
-viewControls : String -> List Entry -> Html Msg
+viewControls : Visibility -> List Entry -> Html Msg
 viewControls visibility entries =
     let
         entriesCompleted =
@@ -387,26 +425,25 @@ viewControlsCount entriesLeft =
             ]
 
 
-viewControlsFilters : String -> Html Msg
+viewControlsFilters : Visibility -> Html Msg
 viewControlsFilters visibility =
     ul
         [ class "filters" ]
-        [ visibilitySwap "#/" "All" visibility
+        [ visibilitySwap "#/" All visibility
         , text " "
-        , visibilitySwap "#/active" "Active" visibility
+        , visibilitySwap "#/active" Active visibility
         , text " "
-        , visibilitySwap "#/completed" "Completed" visibility
+        , visibilitySwap "#/completed" Completed visibility
         ]
 
 
-visibilitySwap : String -> String -> String -> Html Msg
+visibilitySwap : String -> Visibility -> Visibility -> Html Msg
 visibilitySwap uri visibility actualVisibility =
     li
         [ onClick (ChangeVisibility visibility) ]
         [ a [ href uri, classList [ ( "selected", visibility == actualVisibility ) ] ]
-            [ text visibility ]
+            [ text (visibilityText visibility) ]
         ]
-
 
 viewControlsClear : Int -> Html Msg
 viewControlsClear entriesCompleted =
