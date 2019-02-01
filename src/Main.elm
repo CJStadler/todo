@@ -1,15 +1,16 @@
-port module Main exposing (..)
+port module Main exposing (Date, Entry, Flags, Model, Msg(..), SerializedModel, Visibility(..), deserialize, emptyModel, infoFooter, init, main, newEntry, onEnter, serialize, setStorage, update, updateWithStorage, view, viewControls, viewControlsClear, viewControlsCount, viewControlsFilters, viewEntries, viewEntry, viewInput, viewKeyedEntry, visibilitySwap, visibilityText)
 
 {-| TodoMVC implemented in Elm, using plain HTML and CSS for rendering.
 
 This application is broken up into three key parts:
 
-  1. Model  - a full definition of the application's state
-  2. Update - a way to step the application state forward
-  3. View   - a way to visualize our application state with HTML
+1.  Model - a full definition of the application's state
+2.  Update - a way to step the application state forward
+3.  View - a way to visualize our application state with HTML
 
 This clean division of concerns is a core part of Elm. You can read more about
 this in <http://guide.elm-lang.org/architecture/index.html>
+
 -}
 
 import Browser
@@ -23,11 +24,11 @@ import Json.Decode as Json
 import Task
 
 
-main : Program (Maybe SerializedModel) Model Msg
+main : Program Flags Model Msg
 main =
     Browser.document
         { init = init
-        , view = \model -> { title = "Elm • TodoMVC", body = [view model] }
+        , view = \model -> { title = "Elm • TodoMVC", body = [ view model ] }
         , update = updateWithStorage
         , subscriptions = \_ -> Sub.none
         }
@@ -45,9 +46,9 @@ updateWithStorage msg model =
         ( newModel, cmds ) =
             update msg model
     in
-        ( newModel
-        , Cmd.batch [ setStorage (serialize newModel), cmds ]
-        )
+    ( newModel
+    , Cmd.batch [ setStorage (serialize newModel), cmds ]
+    )
 
 
 type alias SerializedModel =
@@ -57,55 +58,82 @@ type alias SerializedModel =
     , visibility : String
     }
 
+
 serialize : Model -> SerializedModel
 serialize model =
     { entries = model.entries
     , field = model.field
     , uid = model.uid
-    , visibility = visibilityText model.visibility }
+    , visibility = visibilityText model.visibility
+    }
 
-deserialize : SerializedModel -> Model
-deserialize model =
+
+deserialize : Flags -> Model
+deserialize flags =
     let
+        defaults =
+            Maybe.withDefault emptyModel flags.model
+
         viz =
-            if visibilityText (Active) == model.visibility then
+            if visibilityText Active == defaults.visibility then
                 Active
-            else if visibilityText (Completed) == model.visibility then
+
+            else if visibilityText Completed == defaults.visibility then
                 Completed
+
             else
                 All
     in
-    { entries = model.entries
-    , field = model.field
-    , uid = model.uid
-    , visibility = viz }
+    { entries = defaults.entries
+    , field = defaults.field
+    , uid = defaults.uid
+    , visibility = viz
+    , currentDate = flags.currentDate
+    }
+
+
 
 -- MODEL
 
-type Visibility = All
-                | Active
-                | Completed
+
+type Visibility
+    = All
+    | Active
+    | Completed
+
 
 visibilityText : Visibility -> String
 visibilityText visibility =
     case visibility of
-        All -> "All"
-        Active -> "Active"
-        Completed -> "Done"
+        All ->
+            "All"
+
+        Active ->
+            "Active"
+
+        Completed ->
+            "Done"
+
+
 
 -- The full application state of our todo app.
+
+
 type alias Model =
     { entries : List Entry
     , field : String
     , uid : Int
     , visibility : Visibility
+    , currentDate : Date
     }
+
 
 type alias Entry =
     { description : String
     , completed : Bool
     , editing : Bool
     , id : Int
+    , date : Date
     }
 
 
@@ -118,20 +146,34 @@ emptyModel =
     }
 
 
-newEntry : String -> Int -> Entry
-newEntry desc id =
+newEntry : String -> Int -> Date -> Entry
+newEntry desc id date =
     { description = desc
     , completed = False
     , editing = False
     , id = id
+    , date = date
     }
 
 
-init : Maybe SerializedModel -> ( Model, Cmd Msg )
-init maybeModel =
-  ( deserialize (Maybe.withDefault emptyModel maybeModel)
-  , Cmd.none
-  )
+type alias Date =
+    { year : Int
+    , month : Int
+    , dayOfMonth : Int
+    }
+
+
+type alias Flags =
+    { model : Maybe SerializedModel
+    , currentDate : Date
+    }
+
+
+init : Flags -> ( Model, Cmd Msg )
+init flags =
+    ( deserialize flags
+    , Cmd.none
+    )
 
 
 
@@ -157,6 +199,8 @@ type Msg
 
 
 -- How we update our Model on a given Msg?
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -170,8 +214,13 @@ update msg model =
                 , entries =
                     if String.isEmpty model.field then
                         model.entries
+
                     else
-                        model.entries ++ [ newEntry model.field model.uid ]
+                        model.entries
+                            ++ [ newEntry model.field
+                                    model.uid
+                                    model.currentDate
+                               ]
               }
             , Cmd.none
             )
@@ -186,6 +235,7 @@ update msg model =
                 updateEntry t =
                     if t.id == id then
                         { t | editing = isEditing }
+
                     else
                         t
 
@@ -201,6 +251,7 @@ update msg model =
                 updateEntry t =
                     if t.id == id then
                         { t | description = task }
+
                     else
                         t
             in
@@ -223,6 +274,7 @@ update msg model =
                 updateEntry t =
                     if t.id == id then
                         { t | completed = isCompleted }
+
                     else
                         t
             in
@@ -289,10 +341,11 @@ onEnter msg =
         isEnter code =
             if code == 13 then
                 Json.succeed msg
+
             else
                 Json.fail "not ENTER"
     in
-        on "keydown" (Json.andThen isEnter keyCode)
+    on "keydown" (Json.andThen isEnter keyCode)
 
 
 
@@ -319,27 +372,28 @@ viewEntries visibility entries =
         cssVisibility =
             if List.isEmpty entries then
                 "hidden"
+
             else
                 "visible"
     in
-        section
-            [ class "main"
-            , style "visibility" cssVisibility
+    section
+        [ class "main"
+        , style "visibility" cssVisibility
+        ]
+        [ input
+            [ class "toggle-all"
+            , type_ "checkbox"
+            , name "toggle"
+            , checked allCompleted
+            , onClick (CheckAll (not allCompleted))
             ]
-            [ input
-                [ class "toggle-all"
-                , type_ "checkbox"
-                , name "toggle"
-                , checked allCompleted
-                , onClick (CheckAll (not allCompleted))
-                ]
-                []
-            , label
-                [ for "toggle-all" ]
-                [ text "Mark all as complete" ]
-            , Keyed.ul [ class "todo-list" ] <|
-                List.map viewKeyedEntry (List.filter isVisible entries)
-            ]
+            []
+        , label
+            [ for "toggle-all" ]
+            [ text "Mark all as complete" ]
+        , Keyed.ul [ class "todo-list" ] <|
+            List.map viewKeyedEntry (List.filter isVisible entries)
+        ]
 
 
 
@@ -399,14 +453,14 @@ viewControls visibility entries =
         entriesLeft =
             List.length entries - entriesCompleted
     in
-        footer
-            [ class "footer"
-            , hidden (List.isEmpty entries)
-            ]
-            [ lazy viewControlsCount entriesLeft
-            , lazy viewControlsFilters visibility
-            , lazy viewControlsClear entriesCompleted
-            ]
+    footer
+        [ class "footer"
+        , hidden (List.isEmpty entries)
+        ]
+        [ lazy viewControlsCount entriesLeft
+        , lazy viewControlsFilters visibility
+        , lazy viewControlsClear entriesCompleted
+        ]
 
 
 viewControlsCount : Int -> Html Msg
@@ -415,14 +469,15 @@ viewControlsCount entriesLeft =
         item_ =
             if entriesLeft == 1 then
                 " item"
+
             else
                 " items"
     in
-        span
-            [ class "todo-count" ]
-            [ strong [] [ text (String.fromInt entriesLeft) ]
-            , text (item_ ++ " left")
-            ]
+    span
+        [ class "todo-count" ]
+        [ strong [] [ text (String.fromInt entriesLeft) ]
+        , text (item_ ++ " left")
+        ]
 
 
 viewControlsFilters : Visibility -> Html Msg
@@ -444,6 +499,7 @@ visibilitySwap uri visibility actualVisibility =
         [ a [ href uri, classList [ ( "selected", visibility == actualVisibility ) ] ]
             [ text (visibilityText visibility) ]
         ]
+
 
 viewControlsClear : Int -> Html Msg
 viewControlsClear entriesCompleted =

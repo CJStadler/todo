@@ -12,9 +12,18 @@
 </body>
 
 <script type="text/javascript">
-var storedState = localStorage.getItem('elm-todo-save');
-var startingState = storedState ? JSON.parse(storedState) : null;
-var app = Elm.Main.init({ flags: startingState });
+let storedState = localStorage.getItem('elm-todo-save');
+let startingState = storedState ? JSON.parse(storedState) : null;
+let currentDate = new Date();
+let flags = {
+  model: startingState,
+  currentDate: {
+    year: currentDate.getFullYear(),
+    month: currentDate.getMonth(),
+    dayOfMonth: currentDate.getDate()
+  }
+}
+let app = Elm.Main.init({ flags: flags });
 app.ports.setStorage.subscribe(function(state) {
     localStorage.setItem('elm-todo-save', JSON.stringify(state));
 });
