@@ -1,4 +1,4 @@
-port module Main exposing (Date, Entry, Flags, Model, Msg(..), SerializedModel, Visibility(..), deserialize, emptyModel, infoFooter, init, main, newEntry, onEnter, serialize, setStorage, update, updateWithStorage, view, viewControls, viewControlsClear, viewControlsCount, viewControlsFilters, viewEntries, viewEntry, viewInput, viewKeyedEntry, visibilitySwap, visibilityText)
+port module Main exposing (Flags, Model, Msg(..), SerializedModel, Visibility(..), deserialize, emptyModel, infoFooter, init, main, onEnter, serialize, setStorage, update, updateWithStorage, view, viewControls, viewControlsClear, viewControlsCount, viewControlsFilters, viewEntries, viewEntry, viewInput, viewKeyedEntry, visibilitySwap, visibilityText)
 
 {-| TodoMVC implemented in Elm, using plain HTML and CSS for rendering.
 
@@ -15,6 +15,8 @@ this in <http://guide.elm-lang.org/architecture/index.html>
 
 import Browser
 import Browser.Dom as Dom
+import Date exposing (Date)
+import Entry exposing (Entry)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
@@ -52,7 +54,7 @@ updateWithStorage msg model =
 
 
 type alias SerializedModel =
-    { entries : List Entry
+    { entries : List Entry.Serialized
     , field : String
     , uid : Int
     , visibility : String
@@ -61,7 +63,7 @@ type alias SerializedModel =
 
 serialize : Model -> SerializedModel
 serialize model =
-    { entries = model.entries
+    { entries = List.map Entry.serialize model.entries
     , field = model.field
     , uid = model.uid
     , visibility = visibilityText model.visibility
@@ -71,24 +73,24 @@ serialize model =
 deserialize : Flags -> Model
 deserialize flags =
     let
-        defaults =
+        serialized =
             Maybe.withDefault emptyModel flags.model
 
         viz =
-            if visibilityText Active == defaults.visibility then
+            if visibilityText Active == serialized.visibility then
                 Active
 
-            else if visibilityText Completed == defaults.visibility then
+            else if visibilityText Completed == serialized.visibility then
                 Completed
 
             else
                 All
     in
-    { entries = defaults.entries
-    , field = defaults.field
-    , uid = defaults.uid
+    { entries = List.map Entry.deserialize serialized.entries
+    , field = serialized.field
+    , uid = serialized.uid
     , visibility = viz
-    , currentDate = flags.currentDate
+    , currentDate = Date.deserialize flags.currentDate
     }
 
 
@@ -128,15 +130,6 @@ type alias Model =
     }
 
 
-type alias Entry =
-    { description : String
-    , completed : Bool
-    , editing : Bool
-    , id : Int
-    , date : Date
-    }
-
-
 emptyModel : SerializedModel
 emptyModel =
     { entries = []
@@ -146,26 +139,9 @@ emptyModel =
     }
 
 
-newEntry : String -> Int -> Date -> Entry
-newEntry desc id date =
-    { description = desc
-    , completed = False
-    , editing = False
-    , id = id
-    , date = date
-    }
-
-
-type alias Date =
-    { year : Int
-    , month : Int
-    , dayOfMonth : Int
-    }
-
-
 type alias Flags =
     { model : Maybe SerializedModel
-    , currentDate : Date
+    , currentDate : Date.Serialized
     }
 
 
@@ -217,7 +193,7 @@ update msg model =
 
                     else
                         model.entries
-                            ++ [ newEntry model.field
+                            ++ [ Entry.new model.field
                                     model.uid
                                     model.currentDate
                                ]
@@ -232,48 +208,44 @@ update msg model =
 
         EditingEntry id isEditing ->
             let
-                updateEntry t =
-                    if t.id == id then
-                        { t | editing = isEditing }
+                operation entry =
+                    if Entry.id entry == id then
+                        Entry.update (Entry.Editing isEditing) entry
 
                     else
-                        t
+                        entry
 
                 focus =
                     Dom.focus ("todo-" ++ String.fromInt id)
             in
-            ( { model | entries = List.map updateEntry model.entries }
+            ( { model | entries = List.map operation model.entries }
             , Task.attempt (\_ -> NoOp) focus
             )
 
         UpdateEntry id task ->
             let
-                updateEntry t =
-                    if t.id == id then
-                        { t | description = task }
-
-                    else
-                        t
+                operation =
+                    Entry.update (Entry.Description task)
             in
-            ( { model | entries = List.map updateEntry model.entries }
+            ( { model | entries = List.map operation model.entries }
             , Cmd.none
             )
 
         Delete id ->
-            ( { model | entries = List.filter (\t -> t.id /= id) model.entries }
+            ( { model | entries = List.filter (\t -> Entry.id t /= id) model.entries }
             , Cmd.none
             )
 
         DeleteComplete ->
-            ( { model | entries = List.filter (not << .completed) model.entries }
+            ( { model | entries = List.filter (not << Entry.completed) model.entries }
             , Cmd.none
             )
 
         Check id isCompleted ->
             let
                 updateEntry t =
-                    if t.id == id then
-                        { t | completed = isCompleted }
+                    if Entry.id t == id then
+                        Entry.update (Entry.Completed isCompleted) t
 
                     else
                         t
@@ -285,7 +257,7 @@ update msg model =
         CheckAll isCompleted ->
             let
                 updateEntry t =
-                    { t | completed = isCompleted }
+                    Entry.update (Entry.Completed isCompleted) t
             in
             ( { model | entries = List.map updateEntry model.entries }
             , Cmd.none
@@ -358,16 +330,16 @@ viewEntries visibility entries =
         isVisible todo =
             case visibility of
                 Completed ->
-                    todo.completed
+                    Entry.completed todo
 
                 Active ->
-                    not todo.completed
+                    not (Entry.completed todo)
 
                 All ->
                     True
 
         allCompleted =
-            List.all .completed entries
+            List.all Entry.completed entries
 
         cssVisibility =
             if List.isEmpty entries then
@@ -402,39 +374,45 @@ viewEntries visibility entries =
 
 viewKeyedEntry : Entry -> ( String, Html Msg )
 viewKeyedEntry todo =
-    ( String.fromInt todo.id, lazy viewEntry todo )
+    ( String.fromInt (Entry.id todo), lazy viewEntry todo )
 
 
 viewEntry : Entry -> Html Msg
 viewEntry todo =
     li
-        [ classList [ ( "completed", todo.completed ), ( "editing", todo.editing ) ] ]
+        [ classList
+            [ ( "completed", Entry.completed todo )
+            , ( "editing"
+              , Entry.editing todo
+              )
+            ]
+        ]
         [ div
             [ class "view" ]
             [ input
                 [ class "toggle"
                 , type_ "checkbox"
-                , checked todo.completed
-                , onClick (Check todo.id (not todo.completed))
+                , checked (Entry.completed todo)
+                , onClick (Check (Entry.id todo) (not (Entry.completed todo)))
                 ]
                 []
             , label
-                [ onDoubleClick (EditingEntry todo.id True) ]
-                [ text todo.description ]
+                [ onDoubleClick (EditingEntry (Entry.id todo) True) ]
+                [ text (Entry.description todo) ]
             , button
                 [ class "destroy"
-                , onClick (Delete todo.id)
+                , onClick (Delete (Entry.id todo))
                 ]
                 []
             ]
         , input
             [ class "edit"
-            , value todo.description
+            , value (Entry.description todo)
             , name "title"
-            , id ("todo-" ++ String.fromInt todo.id)
-            , onInput (UpdateEntry todo.id)
-            , onBlur (EditingEntry todo.id False)
-            , onEnter (EditingEntry todo.id False)
+            , id ("todo-" ++ String.fromInt (Entry.id todo))
+            , onInput (UpdateEntry (Entry.id todo))
+            , onBlur (EditingEntry (Entry.id todo) False)
+            , onEnter (EditingEntry (Entry.id todo) False)
             ]
             []
         ]
@@ -448,7 +426,7 @@ viewControls : Visibility -> List Entry -> Html Msg
 viewControls visibility entries =
     let
         entriesCompleted =
-            List.length (List.filter .completed entries)
+            List.length (List.filter Entry.completed entries)
 
         entriesLeft =
             List.length entries - entriesCompleted
