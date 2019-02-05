@@ -1,11 +1,15 @@
-# TodoMVC in Elm - [Try It!](http://evancz.github.io/elm-todomvc)
+# TODO app in Elm
 
-All of the Elm code lives in `src/Main.elm` and relies on the [elm/html][html] library.
+This is forked from https://github.com/evancz/elm-todomvlc, but my intention is
+to grow this into a more useful application, not a demo.
 
-[html]: https://package.elm-lang.org/packages/elm/html/latest
+## Goals
 
-There also is a port handler set up in `index.html` to store the Elm application's state in `localStorage` on every update.
-
+- Entries should be organized by day.
+- When opened for the first time the user should be asked whether they want to
+  import incomplete entries from the previous day.
+- Should be able to add entries for future days.
+- Should be able to create recurring entries.
 
 ## Build Instructions
 
