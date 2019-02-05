@@ -19,7 +19,7 @@ let flags = {
   model: startingState,
   currentDate: {
     year: currentDate.getFullYear(),
-    month: currentDate.getMonth(),
+    month: currentDate.getMonth() + 1, // getMonth() starts at 0
     dayOfMonth: currentDate.getDate()
   }
 }

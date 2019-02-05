@@ -1,4 +1,4 @@
-port module Main exposing (Flags, Model, Msg(..), SerializedModel, Visibility(..), deserialize, emptyModel, infoFooter, init, main, onEnter, serialize, setStorage, update, updateWithStorage, view, viewControls, viewControlsClear, viewControlsCount, viewControlsFilters, viewEntries, viewEntry, viewInput, viewKeyedEntry, visibilitySwap, visibilityText)
+port module Main exposing (Flags, Model, Msg(..), SerializedModel, Visibility(..), emptyModel, infoFooter, init, initModel, main, onEnter, serialize, setStorage, update, updateWithStorage, view, viewControls, viewControlsClear, viewControlsCount, viewControlsFilters, viewEntries, viewEntry, viewHeader, viewKeyedEntry, visibilitySwap, visibilityText)
 
 {-| TodoMVC implemented in Elm, using plain HTML and CSS for rendering.
 
@@ -23,6 +23,7 @@ import Html.Events exposing (..)
 import Html.Keyed as Keyed
 import Html.Lazy exposing (lazy, lazy2)
 import Json.Decode as Json
+import Maybe
 import Task
 
 
@@ -70,8 +71,8 @@ serialize model =
     }
 
 
-deserialize : Flags -> Model
-deserialize flags =
+initModel : Flags -> Model
+initModel flags =
     let
         serialized =
             Maybe.withDefault emptyModel flags.model
@@ -90,7 +91,7 @@ deserialize flags =
     , field = serialized.field
     , uid = serialized.uid
     , visibility = viz
-    , currentDate = Date.deserialize flags.currentDate
+    , currentDate = Date.fromRataDie 0 -- TODO: Handle this better.
     }
 
 
@@ -140,15 +141,13 @@ emptyModel =
 
 
 type alias Flags =
-    { model : Maybe SerializedModel
-    , currentDate : Date.Serialized
-    }
+    { model : Maybe SerializedModel }
 
 
 init : Flags -> ( Model, Cmd Msg )
 init flags =
-    ( deserialize flags
-    , Cmd.none
+    ( initModel flags
+    , Task.perform SetDate Date.today
     )
 
 
@@ -162,6 +161,7 @@ to them.
 -}
 type Msg
     = NoOp
+    | SetDate Date
     | UpdateField String
     | EditingEntry Int Bool
     | UpdateEntry Int String
@@ -182,6 +182,11 @@ update msg model =
     case msg of
         NoOp ->
             ( model, Cmd.none )
+
+        SetDate date ->
+            ( { model | currentDate = date }
+            , Cmd.none
+            )
 
         Add ->
             ( { model
@@ -275,30 +280,51 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
+    let
+        onCurrentDate =
+            \todo -> Date.compare model.currentDate (Entry.date todo) == EQ
+
+        currentEntries =
+            List.filter onCurrentDate model.entries
+    in
     div
         [ class "todomvc-wrapper"
         , style "visibility" "hidden"
         ]
         [ section
             [ class "todoapp" ]
-            [ lazy viewInput model.field
-            , lazy2 viewEntries model.visibility model.entries
-            , lazy2 viewControls model.visibility model.entries
+            [ lazy2 viewHeader model.currentDate model.field
+            , lazy2 viewEntries model.visibility currentEntries
+            , lazy2 viewControls model.visibility currentEntries
             ]
         , infoFooter
         ]
 
 
-viewInput : String -> Html Msg
-viewInput task =
+viewHeader : Date -> String -> Html Msg
+viewHeader currentDate todoStr =
+    let
+        dateString =
+            Date.format "MMM ddd, y" currentDate
+
+        previousDay =
+            SetDate (Date.add Date.Days -1 currentDate)
+
+        nextDay =
+            SetDate (Date.add Date.Days 1 currentDate)
+    in
     header
         [ class "header" ]
-        [ h1 [] [ text "todos" ]
+        [ h1 [] [ text dateString ]
+        , div []
+            [ button [ onClick previousDay ] [ text "Previous" ]
+            , button [ onClick nextDay ] [ text "Next" ]
+            ]
         , input
             [ class "new-todo"
             , placeholder "What needs to be done?"
             , autofocus True
-            , value task
+            , value todoStr
             , name "newTodo"
             , onInput UpdateField
             , onEnter Add

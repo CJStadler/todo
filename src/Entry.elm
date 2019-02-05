@@ -40,7 +40,7 @@ type alias Serialized =
     , completed : Bool
     , editing : Bool
     , id : Int
-    , date : Date.Serialized
+    , date : Int
     }
 
 
@@ -99,7 +99,7 @@ serialize (Entry r) =
     , completed = r.completed
     , editing = r.editing
     , id = r.id
-    , date = Date.serialize r.date
+    , date = Date.toRataDie r.date
     }
 
 
@@ -110,5 +110,5 @@ deserialize e =
         , completed = e.completed
         , editing = e.editing
         , id = e.id
-        , date = Date.deserialize e.date
+        , date = Date.fromRataDie e.date
         }
