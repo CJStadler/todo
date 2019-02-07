@@ -16,7 +16,7 @@ to grow this into a more useful application, not a demo.
 Run the following command from the root of this project:
 
 ```bash
-elm make src/Main.elm --output=elm.js
+make
 ```
 
 Then open `index.html` in your browser!
