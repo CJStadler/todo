@@ -21,7 +21,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Html.Keyed as Keyed
-import Html.Lazy exposing (lazy, lazy2)
+import Html.Lazy exposing (..)
 import Json.Decode as Json
 import Maybe
 import Task
@@ -91,6 +91,7 @@ initModel flags =
     , field = serialized.field
     , uid = serialized.uid
     , visibility = viz
+    , editingId = Maybe.Nothing
     , currentDate = Date.fromRataDie 0 -- TODO: Handle this better.
     }
 
@@ -122,11 +123,17 @@ visibilityText visibility =
 -- The full application state of our todo app.
 
 
+type alias EntryId =
+    -- TODO: Move to Entry module
+    Int
+
+
 type alias Model =
     { entries : List Entry
     , field : String
-    , uid : Int
+    , uid : EntryId
     , visibility : Visibility
+    , editingId : Maybe EntryId
     , currentDate : Date
     }
 
@@ -163,7 +170,8 @@ type Msg
     = NoOp
     | SetDate Date
     | UpdateField String
-    | EditingEntry Int Bool
+    | EditingEntry Int
+    | FinishEdit
     | UpdateEntry Int String
     | Add
     | Delete Int
@@ -211,20 +219,18 @@ update msg model =
             , Cmd.none
             )
 
-        EditingEntry id isEditing ->
+        EditingEntry id ->
             let
-                operation entry =
-                    if Entry.id entry == id then
-                        Entry.update (Entry.Editing isEditing) entry
-
-                    else
-                        entry
-
                 focus =
                     Dom.focus ("todo-" ++ String.fromInt id)
             in
-            ( { model | entries = List.map operation model.entries }
+            ( { model | editingId = Maybe.Just id }
             , Task.attempt (\_ -> NoOp) focus
+            )
+
+        FinishEdit ->
+            ( { model | editingId = Maybe.Nothing }
+            , Cmd.none
             )
 
         UpdateEntry id task ->
@@ -280,13 +286,6 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    let
-        onCurrentDate =
-            \todo -> Date.compare model.currentDate (Entry.date todo) == EQ
-
-        currentEntries =
-            List.filter onCurrentDate model.entries
-    in
     div
         [ class "todomvc-wrapper"
         , style "visibility" "hidden"
@@ -294,8 +293,7 @@ view model =
         [ section
             [ class "todoapp" ]
             [ lazy2 viewHeader model.currentDate model.field
-            , lazy2 viewEntries model.visibility currentEntries
-            , lazy2 viewControls model.visibility currentEntries
+            , viewEntryList model.currentDate model.visibility model.editingId model.entries
             ]
         , infoFooter
         ]
@@ -350,8 +348,23 @@ onEnter msg =
 -- VIEW ALL ENTRIES
 
 
-viewEntries : Visibility -> List Entry -> Html Msg
-viewEntries visibility entries =
+viewEntryList : Date -> Visibility -> Maybe EntryId -> List Entry -> Html Msg
+viewEntryList currentDate visibility editingId entries =
+    let
+        onCurrentDate =
+            \todo -> Date.compare currentDate (Entry.date todo) == EQ
+
+        currentEntries =
+            List.filter onCurrentDate entries
+    in
+    div []
+        [ lazy3 viewEntries visibility editingId currentEntries
+        , lazy2 viewControls visibility currentEntries
+        ]
+
+
+viewEntries : Visibility -> Maybe EntryId -> List Entry -> Html Msg
+viewEntries visibility editingId entries =
     let
         isVisible todo =
             case visibility of
@@ -364,6 +377,9 @@ viewEntries visibility entries =
                 All ->
                     True
 
+        visibleEntries =
+            List.filter isVisible entries
+
         allCompleted =
             List.all Entry.completed entries
 
@@ -373,6 +389,14 @@ viewEntries visibility entries =
 
             else
                 "visible"
+
+        editingEntry entry =
+            case editingId of
+                Just id ->
+                    id == Entry.id entry
+
+                Nothing ->
+                    False
     in
     section
         [ class "main"
@@ -390,7 +414,8 @@ viewEntries visibility entries =
             [ for "toggle-all" ]
             [ text "Mark all as complete" ]
         , Keyed.ul [ class "todo-list" ] <|
-            List.map viewKeyedEntry (List.filter isVisible entries)
+            List.map (\e -> viewKeyedEntry (editingEntry e) e)
+                visibleEntries
         ]
 
 
@@ -398,19 +423,23 @@ viewEntries visibility entries =
 -- VIEW INDIVIDUAL ENTRIES
 
 
-viewKeyedEntry : Entry -> ( String, Html Msg )
-viewKeyedEntry todo =
-    ( String.fromInt (Entry.id todo), lazy viewEntry todo )
+viewKeyedEntry : Bool -> Entry -> ( String, Html Msg )
+viewKeyedEntry editing entry =
+    ( String.fromInt (Entry.id entry)
+    , lazy2 viewEntry editing entry
+    )
 
 
-viewEntry : Entry -> Html Msg
-viewEntry todo =
+viewEntry : Bool -> Entry -> Html Msg
+viewEntry editing entry =
+    let
+        entryId =
+            Entry.id entry
+    in
     li
         [ classList
-            [ ( "completed", Entry.completed todo )
-            , ( "editing"
-              , Entry.editing todo
-              )
+            [ ( "completed", Entry.completed entry )
+            , ( "editing", editing )
             ]
         ]
         [ div
@@ -418,27 +447,27 @@ viewEntry todo =
             [ input
                 [ class "toggle"
                 , type_ "checkbox"
-                , checked (Entry.completed todo)
-                , onClick (Check (Entry.id todo) (not (Entry.completed todo)))
+                , checked (Entry.completed entry)
+                , onClick (Check entryId (not (Entry.completed entry)))
                 ]
                 []
             , label
-                [ onDoubleClick (EditingEntry (Entry.id todo) True) ]
-                [ text (Entry.description todo) ]
+                [ onDoubleClick (EditingEntry entryId) ]
+                [ text (Entry.description entry) ]
             , button
                 [ class "destroy"
-                , onClick (Delete (Entry.id todo))
+                , onClick (Delete entryId)
                 ]
                 []
             ]
         , input
             [ class "edit"
-            , value (Entry.description todo)
+            , value (Entry.description entry)
             , name "title"
-            , id ("todo-" ++ String.fromInt (Entry.id todo))
-            , onInput (UpdateEntry (Entry.id todo))
-            , onBlur (EditingEntry (Entry.id todo) False)
-            , onEnter (EditingEntry (Entry.id todo) False)
+            , id ("todo-" ++ String.fromInt entryId)
+            , onInput (UpdateEntry entryId)
+            , onBlur FinishEdit
+            , onEnter FinishEdit
             ]
             []
         ]
