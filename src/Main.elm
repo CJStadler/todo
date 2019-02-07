@@ -233,12 +233,16 @@ update msg model =
             , Cmd.none
             )
 
-        UpdateEntry id task ->
+        UpdateEntry id desc ->
             let
-                operation =
-                    Entry.update (Entry.Description task)
+                updateById entry =
+                    if id == Entry.id entry then
+                        Entry.update (Entry.Description desc) entry
+
+                    else
+                        entry
             in
-            ( { model | entries = List.map operation model.entries }
+            ( { model | entries = List.map updateById model.entries }
             , Cmd.none
             )
 
