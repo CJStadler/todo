@@ -1,5 +1,6 @@
 module Entry exposing
     ( Entry
+    , Id
     , Serialized
     , Update(..)
     , completed
@@ -8,6 +9,7 @@ module Entry exposing
     , deserialize
     , id
     , new
+    , onDate
     , serialize
     , update
     )
@@ -19,6 +21,10 @@ type Entry
     = Entry Record
 
 
+type alias Id =
+    Int
+
+
 type Update
     = Description String
     | Completed Bool
@@ -27,7 +33,7 @@ type Update
 type alias Record =
     { description : String
     , completed : Bool
-    , id : Int
+    , id : Id
     , date : Date
     }
 
@@ -40,12 +46,12 @@ type alias Serialized =
     }
 
 
-new : String -> Int -> Date -> Entry
-new desc uid d =
+new : String -> Id -> Date -> Entry
+new desc eid d =
     Entry
         { description = desc
         , completed = False
-        , id = uid
+        , id = eid
         , date = d
         }
 
@@ -60,7 +66,7 @@ completed (Entry r) =
     r.completed
 
 
-id : Entry -> Int
+id : Entry -> Id
 id (Entry r) =
     r.id
 
@@ -68,6 +74,11 @@ id (Entry r) =
 date : Entry -> Date
 date (Entry r) =
     r.date
+
+
+onDate : Date -> Entry -> Bool
+onDate d entry =
+    Date.compare d (date entry) == EQ
 
 
 update : Update -> Entry -> Entry

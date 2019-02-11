@@ -1,6 +1,7 @@
-MAIN = src/Main.elm
+MAIN := src/Main.elm
+SRC_FILES := $(wildcard src/*.elm)
 
-elm.js: $(MAIN)
+elm.js: $(SRC_FILES)
 	elm make $(MAIN) --output=$@
 
 clean:
