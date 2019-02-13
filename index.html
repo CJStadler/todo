@@ -14,14 +14,8 @@
 <script type="text/javascript">
 let storedState = localStorage.getItem('elm-todo-save');
 let startingState = storedState ? JSON.parse(storedState) : null;
-let currentDate = new Date();
 let flags = {
   model: startingState,
-  currentDate: {
-    year: currentDate.getFullYear(),
-    month: currentDate.getMonth() + 1, // getMonth() starts at 0
-    dayOfMonth: currentDate.getDate()
-  }
 }
 let app = Elm.Main.init({ flags: flags });
 app.ports.setStorage.subscribe(function(state) {

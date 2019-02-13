@@ -23,6 +23,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import Html.Keyed as Keyed
 import Html.Lazy exposing (..)
+import ImportEntries exposing (filter, update)
 import Json.Decode as Json
 import Maybe
 import Task
@@ -60,6 +61,7 @@ type alias SerializedModel =
     , field : String
     , nextId : Int
     , visibility : String
+    , lastOpenedRataDie : Int
     }
 
 
@@ -69,6 +71,7 @@ serialize model =
     , field = model.field
     , nextId = model.nextId
     , visibility = EntryList.visibilityText model.listState
+    , lastOpenedRataDie = Date.toRataDie model.lastOpenedDate
     }
 
 
@@ -81,7 +84,9 @@ initModel flags =
     { entries = List.map Entry.deserialize serialized.entries
     , field = serialized.field
     , nextId = serialized.nextId
-    , currentDate = Date.fromRataDie 0 -- TODO: Handle this better.
+    , activeDate = Date.fromRataDie 0 -- TODO: Handle this better.
+    , todayDate = Maybe.Nothing
+    , lastOpenedDate = Date.fromRataDie serialized.lastOpenedRataDie
     , listState = EntryList.init serialized.visibility
     }
 
@@ -96,7 +101,9 @@ type alias Model =
     , field : String
     , nextId : Entry.Id
     , listState : EntryList.Model
-    , currentDate : Date
+    , activeDate : Date
+    , todayDate : Maybe Date
+    , lastOpenedDate : Date -- The last date the application was opened.
     }
 
 
@@ -106,6 +113,7 @@ emptyModel =
     , visibility = "All"
     , field = ""
     , nextId = 0
+    , lastOpenedRataDie = 0
     }
 
 
@@ -116,7 +124,7 @@ type alias Flags =
 init : Flags -> ( Model, Cmd Msg )
 init flags =
     ( initModel flags
-    , Task.perform SetDate Date.today
+    , Task.perform SetToday Date.today
     )
 
 
@@ -130,7 +138,9 @@ to them.
 -}
 type Msg
     = NoOp
+    | SetToday Date
     | SetDate Date
+    | ImportPrevious Bool
     | UpdateField String
     | Add
     | UpdateEntry Entry.Id String
@@ -151,8 +161,42 @@ update msg model =
         NoOp ->
             ( model, Cmd.none )
 
+        SetToday date ->
+            let
+                updatedModel =
+                    setActiveDate model date
+            in
+            ( { updatedModel | todayDate = Maybe.Just date }
+            , Cmd.none
+            )
+
         SetDate date ->
-            ( { model | currentDate = date }
+            ( setActiveDate model date
+            , Cmd.none
+            )
+
+        ImportPrevious shouldImport ->
+            let
+                updated =
+                    case model.todayDate of
+                        Just today ->
+                            let
+                                updatedEntries =
+                                    if shouldImport then
+                                        ImportEntries.update model.lastOpenedDate today model.entries
+
+                                    else
+                                        model.entries
+                            in
+                            { model
+                                | lastOpenedDate = today
+                                , entries = updatedEntries
+                            }
+
+                        Nothing ->
+                            model
+            in
+            ( updated
             , Cmd.none
             )
 
@@ -168,7 +212,7 @@ update msg model =
                         model.entries
                             ++ [ Entry.new model.field
                                     model.nextId
-                                    model.currentDate
+                                    model.activeDate
                                ]
               }
             , Cmd.none
@@ -242,19 +286,34 @@ update msg model =
             )
 
 
+setActiveDate : Model -> Date -> Model
+setActiveDate model date =
+    { model | activeDate = date }
+
+
 
 -- VIEW
 
 
 view : Model -> Html Msg
 view model =
+    let
+        importPrompt =
+            case model.todayDate of
+                Just d ->
+                    lazy3 viewImportPrompt model.lastOpenedDate d model.entries
+
+                Nothing ->
+                    div [] []
+    in
     div
         [ class "todomvc-wrapper"
         , style "visibility" "hidden"
         ]
         [ section
             [ class "todoapp" ]
-            [ lazy2 viewHeader model.currentDate model.field
+            [ importPrompt
+            , lazy2 viewHeader model.activeDate model.field
             , lazy viewEntryList model
             ]
         , infoFooter
@@ -265,14 +324,14 @@ viewEntryList : Model -> Html Msg
 viewEntryList model =
     let
         entries =
-            List.filter (Entry.onDate model.currentDate) model.entries
+            List.filter (Entry.onDate model.activeDate) model.entries
 
         config =
             { check = CheckEntry
-            , checkAll = CheckAll model.currentDate
+            , checkAll = CheckAll model.activeDate
             , updateEntry = UpdateEntry
             , delete = DeleteEntry
-            , deleteComplete = DeleteComplete model.currentDate
+            , deleteComplete = DeleteComplete model.activeDate
             }
 
         html =
@@ -290,16 +349,16 @@ viewEntryList model =
 
 
 viewHeader : Date -> String -> Html Msg
-viewHeader currentDate todoStr =
+viewHeader activeDate todoStr =
     let
         dateString =
-            Date.format "MMM ddd, y" currentDate
+            Date.format "MMM ddd, y" activeDate
 
         previousDay =
-            SetDate (Date.add Date.Days -1 currentDate)
+            SetDate (Date.add Date.Days -1 activeDate)
 
         nextDay =
-            SetDate (Date.add Date.Days 1 currentDate)
+            SetDate (Date.add Date.Days 1 activeDate)
     in
     header
         [ class "header" ]
@@ -321,8 +380,33 @@ viewHeader currentDate todoStr =
         ]
 
 
+viewImportPrompt : Date -> Date -> List Entry -> Html Msg
+viewImportPrompt lastOpened today entries =
+    let
+        entryCount =
+            ImportEntries.filter lastOpened today entries
+                |> List.length
 
--- VIEW ALL ENTRIES
+        contents =
+            if entryCount == 0 then
+                []
+
+            else
+                [ text (promptString lastOpened entryCount)
+                , button [ onClick (ImportPrevious True) ] [ text "Yes" ]
+                , button [ onClick (ImportPrevious False) ] [ text "no" ]
+                ]
+    in
+    div [] contents
+
+
+promptString : Date -> Int -> String
+promptString from count =
+    "Import incomplete entries since "
+        ++ Date.format "MM/dd/yy" from
+        ++ " ("
+        ++ String.fromInt count
+        ++ " entries)?"
 
 
 infoFooter : Html msg
