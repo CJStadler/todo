@@ -12,5 +12,5 @@ test: $(SRC_FILES)
 	npx elm-test
 
 clean:
-	rm elm.js
+	rm $(SITE_DIR)/elm.js
 
