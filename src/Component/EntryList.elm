@@ -151,6 +151,7 @@ viewEntries config (Model r) entries =
 
         visibleEntries =
             List.filter isVisible entries
+                |> List.sortWith compareEntries
 
         allCompleted =
             List.all Entry.completed entries
@@ -189,6 +190,20 @@ viewEntries config (Model r) entries =
             List.map (\e -> viewKeyedEntry config (editingEntry e) e)
                 visibleEntries
         ]
+
+
+compareEntries : Entry -> Entry -> Order
+compareEntries a b =
+    let
+        toInt e =
+            case Entry.completed e of
+                True ->
+                    1
+
+                False ->
+                    0
+    in
+    compare (toInt a) (toInt b)
 
 
 

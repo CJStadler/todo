@@ -1,6 +1,6 @@
 MAIN := src/Main.elm
-SRC_FILES := $(wildcard src/*.elm)
-TEST_FILES := $(wildcard tests/*.elm)
+SRC_FILES := $(shell find src/ -name '*.elm')
+TEST_FILES := $(shell find tests/ -name '*.elm')
 SITE_DIR := site
 
 $(SITE_DIR)/elm.js: $(SRC_FILES)
