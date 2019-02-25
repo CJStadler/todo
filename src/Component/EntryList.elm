@@ -230,7 +230,7 @@ viewEntry config editing entry =
             ]
         ]
         [ div
-            [ class "view" ]
+            [ class "view-entry" ]
             [ input
                 [ class "toggle"
                 , type_ "checkbox"

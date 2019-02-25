@@ -1,4 +1,4 @@
-port module Main exposing (Flags, Model, Msg(..), SerializedModel, emptyModel, infoFooter, init, initModel, main, serialize, setStorage, update, updateWithStorage, view, viewHeader)
+port module Main exposing (Flags, Model, Msg(..), SerializedModel, emptyModel, infoFooter, init, initModel, main, serialize, setStorage, update, updateWithStorage, view)
 
 {-| TodoMVC implemented in Elm, using plain HTML and CSS for rendering.
 
@@ -307,17 +307,53 @@ view model =
                     div [] []
     in
     div
-        [ class "todomvc-wrapper"
-        , style "visibility" "hidden"
-        ]
+        [ class "todomvc-wrapper" ]
         [ section
             [ class "todoapp" ]
-            [ importPrompt
-            , lazy2 viewHeader model.activeDate model.field
-            , lazy viewEntryList model
+            [ lazy viewDate model.activeDate
+            , importPrompt
+            , div [ class "panel" ]
+                [ lazy newEntryInput model.field
+                , lazy viewEntryList model
+                ]
             ]
         , infoFooter
         ]
+
+
+viewDate : Date -> Html Msg
+viewDate activeDate =
+    let
+        dateString =
+            Date.format "MMM ddd, y" activeDate
+
+        previousDay =
+            SetDate (Date.add Date.Days -1 activeDate)
+
+        nextDay =
+            SetDate (Date.add Date.Days 1 activeDate)
+    in
+    div [ id "date-display" ]
+        [ div [ id "date-header" ] [ h1 [] [ text dateString ] ]
+        , div [ id "date-buttons" ]
+            [ button [ id "prev-day", onClick previousDay ] [ text "❮" ]
+            , button [ id "next-day", onClick nextDay ] [ text "❯" ]
+            ]
+        ]
+
+
+newEntryInput : String -> Html Msg
+newEntryInput inputVal =
+    input
+        [ class "new-todo"
+        , placeholder "What needs to be done?"
+        , autofocus True
+        , value inputVal
+        , name "newTodo"
+        , onInput UpdateField
+        , onEnter Add
+        ]
+        []
 
 
 viewEntryList : Model -> Html Msg
@@ -348,38 +384,6 @@ viewEntryList model =
     Html.map toMsg html
 
 
-viewHeader : Date -> String -> Html Msg
-viewHeader activeDate todoStr =
-    let
-        dateString =
-            Date.format "MMM ddd, y" activeDate
-
-        previousDay =
-            SetDate (Date.add Date.Days -1 activeDate)
-
-        nextDay =
-            SetDate (Date.add Date.Days 1 activeDate)
-    in
-    header
-        [ class "header" ]
-        [ h1 [] [ text dateString ]
-        , div []
-            [ button [ onClick previousDay ] [ text "Previous" ]
-            , button [ onClick nextDay ] [ text "Next" ]
-            ]
-        , input
-            [ class "new-todo"
-            , placeholder "What needs to be done?"
-            , autofocus True
-            , value todoStr
-            , name "newTodo"
-            , onInput UpdateField
-            , onEnter Add
-            ]
-            []
-        ]
-
-
 viewImportPrompt : Date -> Date -> List Entry -> Html Msg
 viewImportPrompt lastOpened today entries =
     let
@@ -397,7 +401,7 @@ viewImportPrompt lastOpened today entries =
                 , button [ onClick (ImportPrevious False) ] [ text "no" ]
                 ]
     in
-    div [] contents
+    div [ class "panel" ] contents
 
 
 promptString : Date -> Int -> String
