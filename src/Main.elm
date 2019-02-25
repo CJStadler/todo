@@ -33,7 +33,7 @@ main : Program Flags Model Msg
 main =
     Browser.document
         { init = init
-        , view = \model -> { title = "Elm • TodoMVC", body = [ view model ] }
+        , view = \model -> { title = "TODO", body = [ view model ] }
         , update = updateWithStorage
         , subscriptions = \_ -> Sub.none
         }
@@ -414,11 +414,11 @@ infoFooter =
     footer [ class "info" ]
         [ p [] [ text "Double-click to edit a todo" ]
         , p []
-            [ text "Written by "
-            , a [ href "https://github.com/evancz" ] [ text "Evan Czaplicki" ]
+            [ text "Get the "
+            , a [ href "https://github.com/CJStadler/todo" ] [ text "code" ]
             ]
         , p []
-            [ text "Part of "
-            , a [ href "http://todomvc.com" ] [ text "TodoMVC" ]
+            [ text "Based on "
+            , a [ href "https://github.com/evancz/elm-todomvc" ] [ text "Elm TodoMVC" ]
             ]
         ]
