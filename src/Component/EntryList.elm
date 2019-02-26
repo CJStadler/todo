@@ -10,8 +10,6 @@ import Helpers exposing (onEnter)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Html.Keyed as Keyed
-import Html.Lazy exposing (..)
 import Json.Decode as Json
 import Task
 
@@ -130,8 +128,8 @@ type alias Config msg =
 view : Config msg -> Model -> List Entry -> Html (Msg msg)
 view config (Model r) entries =
     div []
-        [ lazy3 viewEntries config (Model r) entries
-        , lazy3 viewControls config.deleteComplete r.visibility entries
+        [ viewEntries config (Model r) entries
+        , viewControls config.deleteComplete r.visibility entries
         ]
 
 
@@ -186,8 +184,8 @@ viewEntries config (Model r) entries =
         , label
             [ for "toggle-all" ]
             [ text "Mark all as complete" ]
-        , Keyed.ul [ class "todo-list" ] <|
-            List.map (\e -> viewKeyedEntry config (editingEntry e) e)
+        , ul [ class "todo-list" ] <|
+            List.map (\e -> viewEntry config (editingEntry e) e)
                 visibleEntries
         ]
 
@@ -208,13 +206,6 @@ compareEntries a b =
 
 
 -- VIEW INDIVIDUAL ENTRIES
-
-
-viewKeyedEntry : Config msg -> Bool -> Entry -> ( String, Html (Msg msg) )
-viewKeyedEntry config editing entry =
-    ( String.fromInt (Entry.id entry)
-    , lazy3 viewEntry config editing entry
-    )
 
 
 viewEntry : Config msg -> Bool -> Entry -> Html (Msg msg)
@@ -277,9 +268,9 @@ viewControls deleteComplete visibility entries =
         [ class "footer"
         , hidden (List.isEmpty entries)
         ]
-        [ lazy viewControlsCount entriesLeft
-        , lazy viewControlsFilters visibility
-        , lazy2 viewControlsClear deleteComplete entriesCompleted
+        [ viewControlsCount entriesLeft
+        , viewControlsFilters visibility
+        , viewControlsClear deleteComplete entriesCompleted
         ]
 
 

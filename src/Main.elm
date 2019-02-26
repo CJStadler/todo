@@ -21,8 +21,6 @@ import Helpers exposing (onEnter)
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
-import Html.Keyed as Keyed
-import Html.Lazy exposing (..)
 import ImportEntries exposing (filter, update)
 import Json.Decode as Json
 import Maybe
@@ -301,7 +299,7 @@ view model =
         importPrompt =
             case model.todayDate of
                 Just d ->
-                    lazy3 viewImportPrompt model.lastOpenedDate d model.entries
+                    viewImportPrompt model.lastOpenedDate d model.entries
 
                 Nothing ->
                     div [] []
@@ -310,11 +308,11 @@ view model =
         [ class "todomvc-wrapper" ]
         [ section
             [ class "todoapp" ]
-            [ lazy viewDate model.activeDate
+            [ viewDate model.activeDate
             , importPrompt
             , div [ class "panel" ]
-                [ lazy newEntryInput model.field
-                , lazy viewEntryList model
+                [ newEntryInput model.field
+                , viewEntryList model
                 ]
             ]
         , infoFooter
