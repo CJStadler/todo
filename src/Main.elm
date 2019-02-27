@@ -388,18 +388,17 @@ viewImportPrompt lastOpened today entries =
         entryCount =
             ImportEntries.filter lastOpened today entries
                 |> List.length
-
-        contents =
-            if entryCount == 0 then
-                []
-
-            else
-                [ text (promptString lastOpened entryCount)
-                , button [ onClick (ImportPrevious True) ] [ text "Yes" ]
-                , button [ onClick (ImportPrevious False) ] [ text "no" ]
-                ]
     in
-    div [ class "panel" ] contents
+    if entryCount == 0 then
+        text ""
+        -- Empty node.
+
+    else
+        div [ class "panel", id "import-prompt" ]
+            [ p [] [ text (promptString lastOpened entryCount) ]
+            , button [ onClick (ImportPrevious True) ] [ text "Yes" ]
+            , button [ onClick (ImportPrevious False) ] [ text "No" ]
+            ]
 
 
 promptString : Date -> Int -> String

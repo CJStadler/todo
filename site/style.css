@@ -108,6 +108,27 @@ input[type="checkbox"] {
     background-color: rgba(175, 47, 47, 0.20);
 }
 
+#import-prompt {
+  text-align: center;
+  padding: 5px;
+  color: #777;
+}
+
+#import-prompt p {
+  margin: 3px 0;
+}
+
+#import-prompt button {
+  margin: 3px 7px;
+  padding: 3px 7px;
+  border: 1px solid rgba(175, 47, 47, 0.1);
+  border-radius: 3px;
+}
+
+#import-prompt button:hover {
+  border-color: rgba(175, 47, 47, 0.2);
+}
+
 .new-todo,
 .edit {
     position: relative;
