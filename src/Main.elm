@@ -17,6 +17,7 @@ import Browser
 import Component.EntryList as EntryList
 import Date exposing (Date)
 import Entry exposing (Entry)
+import EntrySchedule exposing (EntrySchedule)
 import Helpers exposing (onEnter)
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -79,7 +80,7 @@ initModel flags =
         serialized =
             Maybe.withDefault emptyModel flags.model
     in
-    { entries = List.map Entry.deserialize serialized.entries
+    { schedule = List.map EntrySchedule.decode serialized.schedules
     , field = serialized.field
     , nextId = serialized.nextId
     , activeDate = Date.fromRataDie 0 -- TODO: Handle this better.
@@ -95,7 +96,7 @@ initModel flags =
 
 
 type alias Model =
-    { entries : List Entry
+    { schedules : List EntrySchedule
     , field : String
     , nextId : Entry.Id
     , listState : EntryList.Model
@@ -354,11 +355,16 @@ newEntryInput inputVal =
         []
 
 
+entriesOnDate : Date -> List EntrySchedule -> List Entry
+entriesOnDate date schedules =
+    List.filterMap (EntrySchedule.forDate date) schedules
+
+
 viewEntryList : Model -> Html Msg
 viewEntryList model =
     let
         entries =
-            List.filter (Entry.onDate model.activeDate) model.entries
+            entriesOnDate model.activeDate model.schedules
 
         config =
             { check = CheckEntry
