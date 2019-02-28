@@ -23,7 +23,8 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (..)
 import ImportEntries exposing (filter, update)
-import Json.Decode as Json
+import Json.Decode as Decode
+import Json.Encode as Encode
 import Maybe
 import Task
 
@@ -55,41 +56,6 @@ updateWithStorage msg model =
     )
 
 
-type alias SerializedModel =
-    { entries : List Entry.Serialized
-    , field : String
-    , nextId : Int
-    , visibility : String
-    , lastOpenedRataDie : Int
-    }
-
-
-serialize : Model -> SerializedModel
-serialize model =
-    { entries = List.map Entry.serialize model.entries
-    , field = model.field
-    , nextId = model.nextId
-    , visibility = EntryList.visibilityText model.listState
-    , lastOpenedRataDie = Date.toRataDie model.lastOpenedDate
-    }
-
-
-initModel : Flags -> Model
-initModel flags =
-    let
-        serialized =
-            Maybe.withDefault emptyModel flags.model
-    in
-    { schedule = List.map EntrySchedule.decode serialized.schedules
-    , field = serialized.field
-    , nextId = serialized.nextId
-    , activeDate = Date.fromRataDie 0 -- TODO: Handle this better.
-    , todayDate = Maybe.Nothing
-    , lastOpenedDate = Date.fromRataDie serialized.lastOpenedRataDie
-    , listState = EntryList.init serialized.visibility
-    }
-
-
 
 -- MODEL
 -- The full application state of our todo app.
@@ -108,11 +74,51 @@ type alias Model =
 
 emptyModel : SerializedModel
 emptyModel =
-    { entries = []
+    { schedules = []
     , visibility = "All"
     , field = ""
     , nextId = 0
     , lastOpenedRataDie = 0
+    }
+
+
+type alias SerializedModel =
+    { schedules : List Encode.Value
+    , field : String
+    , nextId : Int
+    , visibility : String
+    , lastOpenedRataDie : Int
+    }
+
+
+serialize : Model -> SerializedModel
+serialize model =
+    { schedules = List.map EntrySchedule.encode model.schedules
+    , field = model.field
+    , nextId = model.nextId
+    , visibility = EntryList.visibilityText model.listState
+    , lastOpenedRataDie = Date.toRataDie model.lastOpenedDate
+    }
+
+
+initModel : Flags -> Model
+initModel flags =
+    let
+        serialized =
+            Maybe.withDefault emptyModel flags.model
+
+        schedules =
+            -- TODO: Handle the failures
+            List.map (Decode.decodeValue EntrySchedule.decode) serialized.schedules
+                |> List.filterMap Result.toMaybe
+    in
+    { schedules = schedules
+    , field = serialized.field
+    , nextId = serialized.nextId
+    , activeDate = Date.fromRataDie 0 -- TODO: Handle this better.
+    , todayDate = Maybe.Nothing
+    , lastOpenedDate = Date.fromRataDie serialized.lastOpenedRataDie
+    , listState = EntryList.init serialized.visibility
     }
 
 
