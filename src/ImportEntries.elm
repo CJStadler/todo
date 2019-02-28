@@ -7,7 +7,7 @@ The range is open on the left and closed on the right.
 -}
 
 import Date exposing (Date)
-import Entry exposing (Entry)
+import EntrySchedule exposing (EntrySchedule)
 
 
 filter : Date -> Date -> List Entry -> List Entry
@@ -15,7 +15,7 @@ filter from to entries =
     List.filter (incompleteInRange from to) entries
 
 
-update : Date -> Date -> List Entry -> List Entry
+update : Date -> Date -> List EntrySchedule -> List EntrySchedule
 update from to entries =
     -- Move incomplete entries on or after `from` to `to`.
     let

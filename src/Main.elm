@@ -188,10 +188,13 @@ update msg model =
                             let
                                 updatedEntries =
                                     if shouldImport then
-                                        ImportEntries.update model.lastOpenedDate today model.entries
+                                        ImportEntries.update
+                                            model.lastOpenedDate
+                                            today
+                                            model.schedules
 
                                     else
-                                        model.entries
+                                        model.schedules
                             in
                             { model
                                 | lastOpenedDate = today

@@ -1,4 +1,11 @@
-module EntrySchedule exposing (EntrySchedule, decode, encode, forDate)
+module EntrySchedule exposing
+    ( EntrySchedule
+    , decode
+    , encode
+    , forDate
+    , newSingle
+    , newWeekly
+    )
 
 {-| A schedule by which entries should be shown.
 
@@ -35,26 +42,48 @@ type alias Id =
 
 
 type Schedule
-    = Single Date
-    | Weekly Weekday
+    = Single Date Bool
+    | Weekly Weekday (List Date) -- Completed dates
 
 
 forDate : Date -> EntrySchedule -> Maybe Entry
 forDate date (EntrySchedule data schedule) =
     case schedule of
-        Single genDate ->
+        Single genDate completed ->
             if date == genDate then
-                Just (Entry.new data.name data.id date)
+                Just
+                    (Entry.update (Entry.Completed True) (Entry.new data.name data.id date))
 
             else
                 Nothing
 
-        Weekly day ->
+        Weekly day completedDates ->
             if Date.weekday date == day then
-                Just (Entry.new data.name data.id date)
+                let
+                    entry =
+                        Entry.new data.name data.id date
+
+                    updated =
+                        if List.member date completedDates then
+                            Entry.update (Entry.Completed True) entry
+
+                        else
+                            entry
+                in
+                Just updated
 
             else
                 Nothing
+
+
+newWeekly : Id -> String -> Weekday -> EntrySchedule
+newWeekly id name day =
+    EntrySchedule { id = id, name = name } (Weekly day [])
+
+
+newSingle : Id -> String -> Date -> EntrySchedule
+newSingle id name date =
+    EntrySchedule { id = id, name = name } (Single date False)
 
 
 encode : EntrySchedule -> Encode.Value
@@ -123,16 +152,21 @@ scheduleDecoder =
 encodeSchedule : Schedule -> Encode.Value
 encodeSchedule schedule =
     case schedule of
-        Single date ->
+        Single date completed ->
             Encode.object
                 [ ( "type", Encode.string "Single" )
                 , ( "rataDie", Encode.int (Date.toRataDie date) )
+                , ( "completed", Encode.bool completed )
                 ]
 
-        Weekly weekday ->
+        Weekly weekday completedList ->
             Encode.object
                 [ ( "type", Encode.string "Weekly" )
                 , ( "weekday", Encode.string (encodeWeekday weekday) )
+                , ( "completedRataDie"
+                  , Encode.list Encode.int
+                        (List.map Date.toRataDie completedList)
+                  )
                 ]
 
 
