@@ -1,5 +1,17 @@
 module EntrySchedule exposing (EntrySchedule, decode, encode, forDate)
 
+{-| A schedule by which entries should be shown.
+
+There are several types of entry schedules:
+
+  - Single: A single entry on a given date.
+  - Weekly: An entry which occurs on a given day of the week.
+
+The main interface is the `forDate` method, which is used to check whether a
+schedule has an entry for a given date.
+
+-}
+
 import Date exposing (Date)
 import Entry exposing (Entry)
 import Json.Decode as Decode
@@ -72,16 +84,31 @@ scheduleDecoder =
         buildSingle rataDie =
             Single (Date.fromRataDie rataDie)
 
-        buildWeekly weekdayStr =
-            Weekly (decodeWeekday weekdayStr)
+        weeklyDecoder : String -> Decode.Decoder Schedule
+        weeklyDecoder dayStr =
+            let
+                maybeDay =
+                    decodeWeekday dayStr
 
+                dayDecoder =
+                    case maybeDay of
+                        Just day ->
+                            Decode.succeed day
+
+                        Nothing ->
+                            Decode.fail ("Weekday " ++ dayStr ++ " not recognized")
+            in
+            Decode.map Weekly dayDecoder
+
+        byType : String -> Decode.Decoder Schedule
         byType typeStr =
             case typeStr of
                 "Single" ->
                     Decode.map buildSingle (Decode.field "rataDie" Decode.int)
 
                 "Weekly" ->
-                    Decode.map buildWeekly (Decode.field "weekday" Decode.string)
+                    Decode.field "weekday" Decode.string
+                        |> Decode.andThen weeklyDecoder
 
                 _ ->
                     Decode.fail <|
@@ -134,29 +161,29 @@ encodeWeekday weekday =
             "Sun"
 
 
-decodeWeekday : String -> Weekday
+decodeWeekday : String -> Maybe Weekday
 decodeWeekday str =
     case str of
         "Mon" ->
-            Mon
+            Just Mon
 
         "Tue" ->
-            Tue
+            Just Tue
 
         "Wed" ->
-            Wed
+            Just Wed
 
         "Thu" ->
-            Thu
+            Just Thu
 
         "Fri" ->
-            Fri
+            Just Fri
 
         "Sat" ->
-            Sat
+            Just Sat
 
         "Sun" ->
-            Sun
+            Just Sun
 
         _ ->
-            Decode.fail <| "Weekday " ++ str ++ " is not recognized."
+            Nothing
