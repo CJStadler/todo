@@ -46,6 +46,39 @@ type Schedule
     | Weekly Weekday (List Date) -- Completed dates
 
 
+{-| Mark a schedule as completed on a certain date.
+-}
+complete : Date -> Bool -> EntrySchedule -> EntrySchedule
+complete completedDate newCompleted (EntrySchedule data schedule) =
+    let
+        newSchedule =
+            case schedule of
+                Single date completed ->
+                    if completedDate == date then
+                        Single date newCompleted
+
+                    else
+                        schedule
+
+                Weekly day completedDates ->
+                    if newCompleted then
+                        Weekly day (completedDate :: completedDates)
+
+                    else
+                        Weekly day (List.filter ((/=) completedDate) completedDates)
+    in
+    EntrySchedule data newSchedule
+
+
+{-| Change the text of a schedule
+-}
+edit : String -> EntrySchedule -> EntrySchedule
+edit text (EntrySchedule data schedule) =
+    EntrySchedule { data | name = text } schedule
+
+
+{-| Get an entry from a schedule for a given date, if there is one.
+-}
 forDate : Date -> EntrySchedule -> Maybe Entry
 forDate date (EntrySchedule data schedule) =
     case schedule of
@@ -110,8 +143,8 @@ decode =
 scheduleDecoder : Decode.Decoder Schedule
 scheduleDecoder =
     let
-        buildSingle rataDie =
-            Single (Date.fromRataDie rataDie)
+        buildSingle rataDie completed =
+            Single (Date.fromRataDie rataDie) completed
 
         weeklyDecoder : String -> Decode.Decoder Schedule
         weeklyDecoder dayStr =
@@ -126,14 +159,19 @@ scheduleDecoder =
 
                         Nothing ->
                             Decode.fail ("Weekday " ++ dayStr ++ " not recognized")
+
+                completedDecoder =
+                    Decode.map (List.map Date.fromRataDie) (Decode.field "completedRataDie" (Decode.list Decode.int))
             in
-            Decode.map Weekly dayDecoder
+            Decode.map2 Weekly dayDecoder completedDecoder
 
         byType : String -> Decode.Decoder Schedule
         byType typeStr =
             case typeStr of
                 "Single" ->
-                    Decode.map buildSingle (Decode.field "rataDie" Decode.int)
+                    Decode.map2 buildSingle
+                        (Decode.field "rataDie" Decode.int)
+                        (Decode.field "completed" Decode.bool)
 
                 "Weekly" ->
                     Decode.field "weekday" Decode.string
