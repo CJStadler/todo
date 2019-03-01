@@ -7,35 +7,35 @@ The range is open on the left and closed on the right.
 -}
 
 import Date exposing (Date)
+import Entry exposing (Entry)
 import EntrySchedule exposing (EntrySchedule)
 
 
-filter : Date -> Date -> List Entry -> List Entry
-filter from to entries =
-    List.filter (incompleteInRange from to) entries
+filter : Date -> Date -> List EntrySchedule -> List Entry
+filter from to schedules =
+    List.filterMap (EntrySchedule.lastInRange from to) schedules
 
 
 update : Date -> Date -> List EntrySchedule -> List EntrySchedule
 update from to entries =
-    -- Move incomplete entries on or after `from` to `to`.
+    -- Copy incomplete entries on or after `from` to `to`.
     let
-        updateIfInRange e =
-            if incompleteInRange from to e then
-                Entry.new (Entry.description e) (Entry.id e) to
+        helper updated original =
+            case original of
+                [] ->
+                    updated
 
-            else
-                e
+                e :: rest ->
+                    case EntrySchedule.lastInRange from to e of
+                        Just entry ->
+                            singleFromEntry entry :: updated
+
+                        Nothing ->
+                            updated
     in
-    List.map updateIfInRange entries
+    helper entries entries
 
 
-incompleteInRange : Date -> Date -> Entry -> Bool
-incompleteInRange from to entry =
-    let
-        -- Date.isBetween takes an open interval, so we subtract 1 from the to
-        -- date.
-        openTo =
-            Date.add Date.Days -1 to
-    in
-    not (Entry.completed entry)
-        && Date.isBetween from openTo (Entry.date entry)
+singleFromEntry : Entry -> EntrySchedule
+singleFromEntry e =
+    EntrySchedule.newSingle 123 (Entry.description e) (Entry.date e)

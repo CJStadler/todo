@@ -3,6 +3,7 @@ module EntrySchedule exposing
     , decode
     , encode
     , forDate
+    , lastInRange
     , newSingle
     , newWeekly
     )
@@ -107,6 +108,23 @@ forDate date (EntrySchedule data schedule) =
 
             else
                 Nothing
+
+
+{-| Get the latest entry in the date range.
+-}
+lastInRange : Date -> Date -> EntrySchedule -> Maybe Entry
+lastInRange from to schedule =
+    if Date.compare to from == LT then
+        Nothing
+
+    else
+        -- Search dates backwards from `to` to `from`.
+        case forDate to schedule of
+            Just entry ->
+                Just entry
+
+            Nothing ->
+                lastInRange from (Date.add Date.Days -1 to) schedule
 
 
 newWeekly : Id -> String -> Weekday -> EntrySchedule
