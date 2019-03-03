@@ -121,7 +121,6 @@ type alias Config msg =
     , checkAll : Bool -> msg
     , updateEntry : Entry.Id -> String -> msg
     , delete : Entry.Id -> msg
-    , deleteComplete : msg
     }
 
 
@@ -129,7 +128,7 @@ view : Config msg -> Model -> List Entry -> Html (Msg msg)
 view config (Model r) entries =
     div []
         [ viewEntries config (Model r) entries
-        , viewControls config.deleteComplete r.visibility entries
+        , viewControls r.visibility entries
         ]
 
 
@@ -255,8 +254,8 @@ viewEntry config editing entry =
 -- VIEW CONTROLS
 
 
-viewControls : msg -> Visibility -> List Entry -> Html (Msg msg)
-viewControls deleteComplete visibility entries =
+viewControls : Visibility -> List Entry -> Html (Msg msg)
+viewControls visibility entries =
     let
         entriesCompleted =
             List.length (List.filter Entry.completed entries)
@@ -270,7 +269,6 @@ viewControls deleteComplete visibility entries =
         ]
         [ viewControlsCount entriesLeft
         , viewControlsFilters visibility
-        , viewControlsClear deleteComplete entriesCompleted
         ]
 
 
@@ -309,15 +307,4 @@ visibilitySwap uri visibility actualVisibility =
         [ onClick (Internal (ChangeVisibility visibility)) ]
         [ a [ href uri, classList [ ( "selected", visibility == actualVisibility ) ] ]
             [ text (visibilityToString visibility) ]
-        ]
-
-
-viewControlsClear : msg -> Int -> Html (Msg msg)
-viewControlsClear deleteComplete entriesCompleted =
-    button
-        [ class "clear-completed"
-        , hidden (entriesCompleted == 0)
-        , onClick (External deleteComplete)
-        ]
-        [ text ("Clear completed (" ++ String.fromInt entriesCompleted ++ ")")
         ]

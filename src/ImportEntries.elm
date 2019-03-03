@@ -38,4 +38,5 @@ update from to entries =
 
 singleFromEntry : Entry -> EntrySchedule
 singleFromEntry e =
+    -- TODO: How to get ID?
     EntrySchedule.newSingle 123 (Entry.description e) (Entry.date e)

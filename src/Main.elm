@@ -93,7 +93,7 @@ type alias SerializedModel =
 
 serialize : Model -> SerializedModel
 serialize model =
-    { schedules = List.map EntrySchedule.encode model.schedules
+    { schedules = Debug.log "schedules" (List.map EntrySchedule.encode model.schedules)
     , field = model.field
     , nextId = model.nextId
     , visibility = EntryList.visibilityText model.listState
@@ -107,10 +107,21 @@ initModel flags =
         serialized =
             Maybe.withDefault emptyModel flags.model
 
+        decode val =
+            case Decode.decodeValue EntrySchedule.decode val of
+                Ok schedule ->
+                    Just schedule
+
+                Err msg ->
+                    let
+                        _ =
+                            Debug.log (Decode.errorToString msg ++ "in") (Encode.encode 0 val)
+                    in
+                    Nothing
+
         schedules =
-            -- TODO: Handle the failures
-            List.map (Decode.decodeValue EntrySchedule.decode) serialized.schedules
-                |> List.filterMap Result.toMaybe
+            List.map decode serialized.schedules
+                |> List.filterMap (\x -> x)
     in
     { schedules = schedules
     , field = serialized.field
@@ -148,10 +159,9 @@ type Msg
     | ImportPrevious Bool
     | UpdateField String
     | Add
-    | UpdateEntry Entry.Id String
-    | DeleteEntry Entry.Id
-    | DeleteComplete Date
-    | CheckEntry Entry.Id Bool
+    | UpdateEntry EntrySchedule.Id String
+    | DeleteEntry EntrySchedule.Id
+    | CheckEntry Date EntrySchedule.Id Bool
     | CheckAll Date Bool
     | EntryListMsg EntryList.InternalMsg
 
@@ -162,7 +172,7 @@ type Msg
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
+    case Debug.log "msg" msg of
         NoOp ->
             ( model, Cmd.none )
 
@@ -198,7 +208,7 @@ update msg model =
                             in
                             { model
                                 | lastOpenedDate = today
-                                , entries = updatedEntries
+                                , schedules = updatedEntries
                             }
 
                         Nothing ->
@@ -212,14 +222,14 @@ update msg model =
             ( { model
                 | nextId = model.nextId + 1
                 , field = ""
-                , entries =
+                , schedules =
                     if String.isEmpty model.field then
-                        model.entries
+                        model.schedules
 
                     else
-                        model.entries
-                            ++ [ Entry.new model.field
-                                    model.nextId
+                        model.schedules
+                            ++ [ EntrySchedule.newSingle model.nextId
+                                    model.field
                                     model.activeDate
                                ]
               }
@@ -233,54 +243,45 @@ update msg model =
 
         UpdateEntry id desc ->
             let
-                updateById entry =
-                    if id == Entry.id entry then
-                        Entry.update (Entry.Description desc) entry
+                updateById schedule =
+                    if id == EntrySchedule.getId schedule then
+                        EntrySchedule.edit desc schedule
 
                     else
-                        entry
+                        schedule
             in
-            ( { model | entries = List.map updateById model.entries }
+            ( { model | schedules = List.map updateById model.schedules }
             , Cmd.none
             )
 
         DeleteEntry id ->
-            ( { model | entries = List.filter (\t -> Entry.id t /= id) model.entries }
+            ( { model
+                | schedules =
+                    List.filter (\t -> EntrySchedule.getId t /= id)
+                        model.schedules
+              }
             , Cmd.none
             )
 
-        DeleteComplete date ->
+        CheckEntry date id isCompleted ->
             let
-                completedOnDate entry =
-                    Entry.completed entry && Entry.date entry == date
-            in
-            ( { model | entries = List.filter (not << completedOnDate) model.entries }
-            , Cmd.none
-            )
-
-        CheckEntry id isCompleted ->
-            let
-                updateEntry t =
-                    if Entry.id t == id then
-                        Entry.update (Entry.Completed isCompleted) t
+                completeEntry schedule =
+                    if EntrySchedule.getId schedule == id then
+                        EntrySchedule.complete date isCompleted schedule
 
                     else
-                        t
+                        schedule
             in
-            ( { model | entries = List.map updateEntry model.entries }
+            ( { model | schedules = List.map completeEntry model.schedules }
             , Cmd.none
             )
 
         CheckAll date isCompleted ->
             let
-                updateEntry t =
-                    if Entry.date t == date then
-                        Entry.update (Entry.Completed isCompleted) t
-
-                    else
-                        t
+                updateSchedule schedule =
+                    EntrySchedule.complete date isCompleted schedule
             in
-            ( { model | entries = List.map updateEntry model.entries }
+            ( { model | schedules = List.map updateSchedule model.schedules }
             , Cmd.none
             )
 
@@ -309,7 +310,7 @@ view model =
         importPrompt =
             case model.todayDate of
                 Just d ->
-                    viewImportPrompt model.lastOpenedDate d model.entries
+                    viewImportPrompt model.lastOpenedDate d model.schedules
 
                 Nothing ->
                     div [] []
@@ -376,11 +377,10 @@ viewEntryList model =
             entriesOnDate model.activeDate model.schedules
 
         config =
-            { check = CheckEntry
+            { check = CheckEntry model.activeDate
             , checkAll = CheckAll model.activeDate
             , updateEntry = UpdateEntry
             , delete = DeleteEntry
-            , deleteComplete = DeleteComplete model.activeDate
             }
 
         html =
@@ -397,11 +397,11 @@ viewEntryList model =
     Html.map toMsg html
 
 
-viewImportPrompt : Date -> Date -> List Entry -> Html Msg
-viewImportPrompt lastOpened today entries =
+viewImportPrompt : Date -> Date -> List EntrySchedule -> Html Msg
+viewImportPrompt lastOpened today schedules =
     let
         entryCount =
-            ImportEntries.filter lastOpened today entries
+            ImportEntries.filter lastOpened today schedules
                 |> List.length
     in
     if entryCount == 0 then

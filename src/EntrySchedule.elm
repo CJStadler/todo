@@ -1,8 +1,12 @@
 module EntrySchedule exposing
     ( EntrySchedule
+    , Id
+    , complete
     , decode
+    , edit
     , encode
     , forDate
+    , getId
     , lastInRange
     , newSingle
     , newWeekly
@@ -47,35 +51,19 @@ type Schedule
     | Weekly Weekday (List Date) -- Completed dates
 
 
-{-| Mark a schedule as completed on a certain date.
--}
-complete : Date -> Bool -> EntrySchedule -> EntrySchedule
-complete completedDate newCompleted (EntrySchedule data schedule) =
-    let
-        newSchedule =
-            case schedule of
-                Single date completed ->
-                    if completedDate == date then
-                        Single date newCompleted
-
-                    else
-                        schedule
-
-                Weekly day completedDates ->
-                    if newCompleted then
-                        Weekly day (completedDate :: completedDates)
-
-                    else
-                        Weekly day (List.filter ((/=) completedDate) completedDates)
-    in
-    EntrySchedule data newSchedule
+newWeekly : Id -> String -> Weekday -> EntrySchedule
+newWeekly id name day =
+    EntrySchedule { id = id, name = name } (Weekly day [])
 
 
-{-| Change the text of a schedule
--}
-edit : String -> EntrySchedule -> EntrySchedule
-edit text (EntrySchedule data schedule) =
-    EntrySchedule { data | name = text } schedule
+newSingle : Id -> String -> Date -> EntrySchedule
+newSingle id name date =
+    EntrySchedule { id = id, name = name } (Single date False)
+
+
+getId : EntrySchedule -> Id
+getId (EntrySchedule data _) =
+    data.id
 
 
 {-| Get an entry from a schedule for a given date, if there is one.
@@ -86,7 +74,7 @@ forDate date (EntrySchedule data schedule) =
         Single genDate completed ->
             if date == genDate then
                 Just
-                    (Entry.update (Entry.Completed True) (Entry.new data.name data.id date))
+                    (Entry.update (Entry.Completed completed) (Entry.new data.name data.id date))
 
             else
                 Nothing
@@ -127,14 +115,35 @@ lastInRange from to schedule =
                 lastInRange from (Date.add Date.Days -1 to) schedule
 
 
-newWeekly : Id -> String -> Weekday -> EntrySchedule
-newWeekly id name day =
-    EntrySchedule { id = id, name = name } (Weekly day [])
+{-| Mark a schedule as completed on a certain date.
+-}
+complete : Date -> Bool -> EntrySchedule -> EntrySchedule
+complete completedDate newCompleted (EntrySchedule data schedule) =
+    let
+        newSchedule =
+            case schedule of
+                Single date completed ->
+                    if completedDate == date then
+                        Single date newCompleted
+
+                    else
+                        schedule
+
+                Weekly day completedDates ->
+                    if newCompleted && Date.weekday completedDate == day then
+                        Weekly day (completedDate :: completedDates)
+
+                    else
+                        Weekly day (List.filter ((/=) completedDate) completedDates)
+    in
+    EntrySchedule data newSchedule
 
 
-newSingle : Id -> String -> Date -> EntrySchedule
-newSingle id name date =
-    EntrySchedule { id = id, name = name } (Single date False)
+{-| Change the text of a schedule
+-}
+edit : String -> EntrySchedule -> EntrySchedule
+edit text (EntrySchedule data schedule) =
+    EntrySchedule { data | name = text } schedule
 
 
 encode : EntrySchedule -> Encode.Value
@@ -155,7 +164,7 @@ decode =
     Decode.map3 buildSchedule
         (Decode.field "id" Decode.int)
         (Decode.field "name" Decode.string)
-        scheduleDecoder
+        (Decode.field "schedule" scheduleDecoder)
 
 
 scheduleDecoder : Decode.Decoder Schedule
