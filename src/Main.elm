@@ -93,7 +93,7 @@ type alias SerializedModel =
 
 serialize : Model -> SerializedModel
 serialize model =
-    { schedules = Debug.log "schedules" (List.map EntrySchedule.encode model.schedules)
+    { schedules = List.map EntrySchedule.encode model.schedules
     , field = model.field
     , nextId = model.nextId
     , visibility = EntryList.visibilityText model.listState
