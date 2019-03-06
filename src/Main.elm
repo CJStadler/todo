@@ -64,7 +64,7 @@ updateWithStorage msg model =
 type alias Model =
     { schedules : List EntrySchedule
     , field : String
-    , nextId : Entry.Id
+    , nextId : EntrySchedule.Id
     , listState : EntryList.Model
     , activeDate : Date
     , todayDate : Maybe Date
@@ -196,19 +196,21 @@ update msg model =
                     case model.todayDate of
                         Just today ->
                             let
-                                updatedEntries =
+                                ( nextId, updatedSchedules ) =
                                     if shouldImport then
                                         ImportEntries.update
                                             model.lastOpenedDate
                                             today
+                                            model.nextId
                                             model.schedules
 
                                     else
-                                        model.schedules
+                                        ( model.nextId, model.schedules )
                             in
                             { model
                                 | lastOpenedDate = today
-                                , schedules = updatedEntries
+                                , nextId = nextId
+                                , schedules = updatedSchedules
                             }
 
                         Nothing ->
@@ -403,6 +405,7 @@ viewImportPrompt lastOpened today schedules =
         entryCount =
             ImportEntries.filter lastOpened today schedules
                 |> List.length
+                |> Debug.log "entries"
     in
     if entryCount == 0 then
         text ""

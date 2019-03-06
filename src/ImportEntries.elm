@@ -13,30 +13,37 @@ import EntrySchedule exposing (EntrySchedule)
 
 filter : Date -> Date -> List EntrySchedule -> List Entry
 filter from to schedules =
-    List.filterMap (EntrySchedule.lastInRange from to) schedules
+    List.filterMap (EntrySchedule.lastInRange from (previous to)) schedules
 
 
-update : Date -> Date -> List EntrySchedule -> List EntrySchedule
-update from to entries =
-    -- Copy incomplete entries on or after `from` to `to`.
+update :
+    Date
+    -> Date
+    -> EntrySchedule.Id
+    -> List EntrySchedule
+    -> ( EntrySchedule.Id, List EntrySchedule )
+update from to nextId schedules =
+    -- Copy incomplete schedules on or after `from` to `to`.
     let
-        helper updated original =
+        new id description =
+            EntrySchedule.newSingle id description to
+
+        recUpdate recId updated original =
             case original of
                 [] ->
-                    updated
+                    ( recId, updated )
 
                 e :: rest ->
-                    case EntrySchedule.lastInRange from to e of
+                    case EntrySchedule.lastInRange from (previous to) e of
                         Just entry ->
-                            singleFromEntry entry :: updated
+                            recUpdate (recId + 1) (new recId (Entry.description entry) :: updated) rest
 
                         Nothing ->
-                            updated
+                            recUpdate recId updated rest
     in
-    helper entries entries
+    recUpdate nextId schedules schedules
 
 
-singleFromEntry : Entry -> EntrySchedule
-singleFromEntry e =
-    -- TODO: How to get ID?
-    EntrySchedule.newSingle 123 (Entry.description e) (Entry.date e)
+previous : Date -> Date
+previous date =
+    Date.add Date.Days -1 date
